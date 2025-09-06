@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": {}
+    },
+    "taskmaster-ai": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
+      "env": {}
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {}
+    },
+    "figma-dev-mode-mcp-server": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3845/sse"
+    }
+  }
+}

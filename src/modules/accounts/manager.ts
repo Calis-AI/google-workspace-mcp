@@ -1,17 +1,21 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Account, AccountsConfig, AccountError, AccountModuleConfig } from './types.js';
+import {Account, AccountsConfig, AccountError, JWTError, AccountModuleConfig, TokenStatus} from './types.js';
 import { scopeRegistry } from '../tools/scope-registry.js';
 import { TokenManager } from './token.js';
+import { JWTTokenManager } from './jwt-token-manager.js';
 import { GoogleOAuthClient } from './oauth.js';
+import { SupabaseConfig } from '../../types/jwt.js';
 import logger from '../../utils/logger.js';
 
 export class AccountManager {
   private readonly accountsPath: string;
   private accounts: Map<string, Account>;
   private tokenManager!: TokenManager;
+  private jwtTokenManager?: JWTTokenManager;
   private oauthClient!: GoogleOAuthClient;
   private currentAuthEmail?: string;
+  private supabaseConfig?: SupabaseConfig;
 
   constructor(config?: AccountModuleConfig) {
     // Use environment variable or config, fallback to Docker default
@@ -19,12 +23,29 @@ export class AccountManager {
                        (process.env.MCP_MODE ? path.resolve(process.env.HOME || '', '.mcp/google-workspace-mcp/accounts.json') : '/app/config/accounts.json');
     this.accountsPath = config?.accountsPath || defaultPath;
     this.accounts = new Map();
+    
+    // 初始化Supabase配置
+    if (config?.supabaseConfig?.enabled && config.supabaseConfig.url && config.supabaseConfig.anonKey) {
+      this.supabaseConfig = {
+        enabled: config.supabaseConfig.enabled,
+        url: config.supabaseConfig.url,
+        anonKey: config.supabaseConfig.anonKey,
+        jwtSecret: config.supabaseConfig.jwtSecret
+      };
+      logger.info('Supabase JWT authentication enabled');
+    }
   }
 
   async initialize(): Promise<void> {
     logger.info('Initializing AccountManager...');
     this.oauthClient = new GoogleOAuthClient();
     this.tokenManager = new TokenManager(this.oauthClient);
+    
+    // 初始化JWT Token Manager（如果启用了Supabase）
+    if (this.supabaseConfig?.enabled) {
+      this.jwtTokenManager = new JWTTokenManager(this.supabaseConfig);
+      logger.info('JWT Token Manager initialized for Supabase authentication');
+    }
     
     // Set up automatic authentication completion
     const { OAuthCallbackServer } = await import('./callback-server.js');
@@ -395,10 +416,127 @@ export class AccountManager {
 
   // Token related methods
   async validateToken(email: string, skipValidationForNew: boolean = false) {
-    return this.tokenManager.validateToken(email, skipValidationForNew);
+    // 获取账户信息
+    const account = this.accounts.get(email);
+    if (!account) {
+      return {
+        valid: false,
+        status: 'NOT_FOUND' as const,
+        reason: 'Account not found'
+      };
+    }
+
+    // 获取当前token
+    const tokenData = await this.tokenManager.getToken(email);
+    if (!tokenData) {
+      return {
+        valid: false,
+        status: 'NO_TOKEN' as const,
+        reason: 'No token found'
+      };
+    }
+
+    // 判断token类型并验证
+    if (this.jwtTokenManager?.isJWTToken(tokenData.access_token)) {
+      // JWT token验证
+      return await this.jwtTokenManager.validateJWT(email, tokenData.access_token);
+    } else {
+      // OAuth token验证（现有逻辑）
+      return await this.tokenManager.validateToken(email, skipValidationForNew);
+    }
   }
 
   async saveToken(email: string, tokenData: any) {
-    return this.tokenManager.saveToken(email, tokenData);
+    // 检查是否是JWT token
+    if (this.jwtTokenManager?.isJWTToken(tokenData.access_token || tokenData)) {
+      // JWT token不需要保存到文件，只存储在内存中
+      const jwt = tokenData.access_token || tokenData;
+      const validation = await this.jwtTokenManager.validateJWT(email, jwt);
+      if (validation.valid) {
+        // 更新账户认证方式
+        const account = this.accounts.get(email);
+        if (account) {
+          account.auth_method = 'jwt';
+          account.jwt_metadata = {
+            provider: 'supabase',
+            claims: validation.claims,
+            expiry: validation.claims?.exp
+          };
+          await this.saveAccounts();
+        }
+        return validation;
+      }
+      throw new JWTError('Invalid JWT token', 'INVALID_JWT', 'Please provide a valid JWT token');
+    }
+    
+    // OAuth token保存（现有逻辑）
+    return await this.tokenManager.saveToken(email, tokenData);
+  }
+
+  // JWT相关新方法
+  async validateJWT(email: string, jwt: string): Promise<TokenStatus> {
+    if (!this.jwtTokenManager) {
+      throw new JWTError('JWT authentication not enabled', 'JWT_NOT_ENABLED', 'Please configure Supabase authentication');
+    }
+    
+    return await this.jwtTokenManager.validateJWT(email, jwt);
+  }
+
+  async createJWTAccount(email: string, jwt: string, category?: string, description?: string): Promise<Account> {
+    if (!this.jwtTokenManager) {
+      throw new JWTError('JWT authentication not enabled', 'JWT_NOT_ENABLED', 'Please configure Supabase authentication');
+    }
+
+    logger.info(`Creating JWT account: ${email}`);
+    
+    // 验证JWT
+    const validation = await this.jwtTokenManager.validateJWT(email, jwt);
+    if (!validation.valid) {
+      throw new JWTError('Invalid JWT token', 'INVALID_JWT', validation.reason || 'JWT validation failed');
+    }
+
+    // 检查账户是否已存在
+    if (this.accounts.has(email)) {
+      const existingAccount = this.accounts.get(email)!;
+      // 更新为JWT认证方式
+      existingAccount.auth_method = 'jwt';
+      existingAccount.jwt_metadata = {
+        provider: 'supabase',
+        claims: validation.claims,
+        expiry: validation.claims?.exp
+      };
+      existingAccount.category = category || existingAccount.category;
+      existingAccount.description = description || existingAccount.description;
+      
+      await this.saveAccounts();
+      logger.info(`Updated existing account to JWT authentication: ${email}`);
+      return existingAccount;
+    }
+
+    // 创建新账户
+    const account: Account = {
+      email,
+      category: category || 'jwt-user',
+      description: description || `JWT user: ${email}`,
+      auth_method: 'jwt',
+      jwt_metadata: {
+        provider: 'supabase',
+        claims: validation.claims,
+        expiry: validation.claims?.exp
+      }
+    };
+
+    this.accounts.set(email, account);
+    await this.saveAccounts();
+    logger.info(`Created new JWT account: ${email}`);
+    return account;
+  }
+
+  async getGoogleTokensFromJWT(email: string): Promise<{ accessToken: string; refreshToken?: string } | null> {
+    if (!this.jwtTokenManager) {
+      return null;
+    }
+    
+    return await this.jwtTokenManager.getGoogleTokensFromJWT(email);
   }
 }

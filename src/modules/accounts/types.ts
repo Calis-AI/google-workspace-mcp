@@ -12,6 +12,14 @@ export interface Account {
     authUrl?: string;
     requiredScopes?: string[];
   };
+  // 新增：认证方式标识
+  auth_method?: 'oauth' | 'jwt' | 'hybrid';
+  // 新增：JWT相关元数据
+  jwt_metadata?: {
+    provider: 'supabase';
+    claims?: any;
+    expiry?: number;
+  };
 }
 
 export interface AccountsConfig {
@@ -52,6 +60,13 @@ export interface AuthenticationError extends AccountError {
 export interface AccountModuleConfig {
   accountsPath?: string;
   oauth2Client?: OAuth2Client;
+  // 新增：Supabase配置
+  supabaseConfig?: {
+    enabled?: boolean;
+    url?: string;
+    anonKey?: string;
+    jwtSecret?: string;
+  };
 }
 
 export class AccountError extends Error {
@@ -62,5 +77,13 @@ export class AccountError extends Error {
   ) {
     super(message);
     this.name = 'AccountError';
+  }
+}
+
+// 新增JWT相关错误类型
+export class JWTError extends AccountError {
+  constructor(message: string, code: string, resolution: string) {
+    super(message, code, resolution);
+    this.name = 'JWTError';
   }
 }
