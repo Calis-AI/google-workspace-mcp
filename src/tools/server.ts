@@ -60,6 +60,10 @@ import { GmailError } from '../modules/gmail/types.js';
 import { CalendarError } from '../modules/calendar/types.js';
 import { ContactsError } from '../modules/contacts/types.js';
 
+// Import JWT authentication
+import { extractJWTFromHeader } from '../middleware/jwt-auth.js';
+import { getAccountManager } from '../modules/accounts/index.js';
+
 // Import service initializer
 import { initializeAllServices } from '../utils/service-initializer.js';
 
@@ -159,11 +163,33 @@ export class GSuiteServer {
       };
     });
 
-    // Handle tool calls
+    // Handle tool calls - MCP合规版本，支持JWT认证
     this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       try {
         const args = request.params.arguments || {};
         const toolName = request.params.name;
+        
+        // MCP规范：从extra参数中提取认证信息（不能使用URI参数）
+        // 最小侵入性：仅提取JWT并内部缓存，不修改工具参数
+
+        if (extra?.headers?.authorization && args?.email) {
+          const jwt = extractJWTFromHeader(extra.headers.authorization);
+          if (jwt) {
+            try {
+              const accountManager = getAccountManager();
+              // 内部缓存JWT，工具无感知
+              const cached = await accountManager.cacheJWT(args.email as string, jwt);
+              if (cached) {
+                logger.debug(`JWT cached for tool: ${toolName}`, { email: args.email });
+              } else {
+                logger.warn(`Failed to cache JWT for tool: ${toolName}`, { email: args.email });
+              }
+            } catch (error) {
+              logger.error('Error caching JWT', { email: args.email, error });
+              // 不中断工具执行，只是记录错误
+            }
+          }
+        }
         
         // Look up the tool using the registry
         const tool = this.toolRegistry.getTool(toolName);

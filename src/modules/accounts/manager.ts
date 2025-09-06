@@ -16,6 +16,8 @@ export class AccountManager {
   private oauthClient!: GoogleOAuthClient;
   private currentAuthEmail?: string;
   private supabaseConfig?: SupabaseConfig;
+  // 新增：内部JWT缓存（工具无感知）
+  private jwtAuthCache: Map<string, {jwt: string, expiry: number}> = new Map();
 
   constructor(config?: AccountModuleConfig) {
     // Use environment variable or config, fallback to Docker default
@@ -538,5 +540,139 @@ export class AccountManager {
     }
     
     return await this.jwtTokenManager.getGoogleTokensFromJWT(email);
+  }
+
+  // ===== 内部JWT缓存机制（工具无感知） =====
+  
+  /**
+   * 内部JWT缓存方法 - 用于MCP集成
+   * 缓存JWT token，供后续工具调用使用
+   * @param email 账户邮箱
+   * @param jwt JWT token
+   * @returns 是否缓存成功
+   */
+  async cacheJWT(email: string, jwt: string): Promise<boolean> {
+    if (!this.jwtTokenManager) {
+      logger.warn('JWT authentication not enabled, cannot cache JWT', { email });
+      return false;
+    }
+    
+    try {
+      logger.info('Caching JWT for account', { email, jwtLength: jwt.length });
+      
+      // 验证JWT有效性
+      const validation = await this.jwtTokenManager.validateJWT(email, jwt);
+      if (!validation.valid) {
+        logger.warn('Invalid JWT, not caching', { email, error: validation.reason });
+        return false;
+      }
+      
+      // 缓存JWT（1小时有效期）
+      const expiry = Date.now() + 3600000; // 1小时
+      this.jwtAuthCache.set(email, { jwt, expiry });
+      
+      logger.info('JWT cached successfully', { email, expiry });
+      return true;
+      
+    } catch (error) {
+      logger.error('Failed to cache JWT', { email, error });
+      return false;
+    }
+  }
+  
+  /**
+   * 获取缓存的JWT
+   * @param email 账户邮箱
+   * @returns JWT token 或 null
+   */
+  private getCachedJWT(email: string): string | null {
+    const cached = this.jwtAuthCache.get(email);
+    if (!cached) {
+      return null;
+    }
+    
+    // 检查是否过期
+    const now = Date.now();
+    if (cached.expiry < now) {
+      logger.info('Cached JWT expired, removing', { email, expiry: cached.expiry, now });
+      this.jwtAuthCache.delete(email);
+      return null;
+    }
+    
+    return cached.jwt;
+  }
+  
+  /**
+   * 清理过期的JWT缓存
+   */
+  private cleanupExpiredJWTCache(): void {
+    const now = Date.now();
+    let removedCount = 0;
+    
+    for (const [email, data] of this.jwtAuthCache.entries()) {
+      if (data.expiry < now) {
+        this.jwtAuthCache.delete(email);
+        removedCount++;
+      }
+    }
+    
+    if (removedCount > 0) {
+      logger.info('Cleaned up expired JWT cache', { removedCount });
+    }
+  }
+  
+  /**
+   * 智能Token验证 - 优先使用JWT缓存，回退到OAuth
+   * @param email 账户邮箱
+   * @param skipValidationForNew 是否跳过新账户验证
+   * @returns Token验证结果
+   */
+  async validateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
+    // 清理过期缓存
+    this.cleanupExpiredJWTCache();
+    
+    // 获取账户信息
+    const account = this.accounts.get(email);
+    if (!account) {
+      return {
+        valid: false,
+        status: 'NOT_FOUND' as const,
+        reason: 'Account not found'
+      };
+    }
+    
+    // 优先检查JWT缓存（工具无感知的JWT认证）
+    const cachedJWT = this.getCachedJWT(email);
+    if (cachedJWT && this.jwtTokenManager) {
+      logger.info('Using cached JWT for validation', { email });
+      return await this.jwtTokenManager.validateJWT(email, cachedJWT);
+    }
+    
+    // 回退到现有的token验证逻辑（OAuth）
+    return await this.existingValidateToken(email, skipValidationForNew);
+  }
+  
+  /**
+   * 原有的Token验证逻辑（重命名避免递归）
+   */
+  private async existingValidateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
+    // 获取当前token
+    const tokenData = await this.tokenManager.getToken(email);
+    if (!tokenData) {
+      return {
+        valid: false,
+        status: 'NO_TOKEN' as const,
+        reason: 'No token found'
+      };
+    }
+    
+    // 判断token类型并验证
+    if (this.jwtTokenManager?.isJWTToken(tokenData.access_token)) {
+      // JWT token验证（来自文件存储）
+      return await this.jwtTokenManager.validateJWT(email, tokenData.access_token);
+    } else {
+      // OAuth token验证（现有逻辑）
+      return await this.tokenManager.validateToken(email, skipValidationForNew);
+    }
   }
 }
