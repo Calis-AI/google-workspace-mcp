@@ -33,7 +33,8 @@ export type TokenStatusType =
   | 'REFRESHED'
   | 'REFRESH_FAILED'
   | 'EXPIRED'
-  | 'ERROR';
+  | 'ERROR'
+  | 'NOT_FOUND';
 
 export interface TokenRenewalResult {
   success: boolean;
@@ -50,6 +51,7 @@ export interface TokenStatus {
   reason?: string;
   authUrl?: string;
   requiredScopes?: string[];
+  claims?: any;
 }
 
 export interface AuthenticationError extends AccountError {

@@ -273,4 +273,26 @@ export class TokenManager {
       };
     }
   }
+
+  /**
+   * Get token status for the given email
+   */
+  async getTokenStatus(email: string): Promise<TokenStatus> {
+    const token = await this.loadToken(email);
+    
+    if (!token) {
+      return {
+        valid: false,
+        status: 'NO_TOKEN',
+        reason: 'No token found'
+      };
+    }
+
+    return {
+      valid: true,
+      status: 'VALID',
+      token,
+      requiredScopes: token.scope ? token.scope.split(' ') : undefined
+    };
+  }
 }

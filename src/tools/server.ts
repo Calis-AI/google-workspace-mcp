@@ -172,8 +172,8 @@ export class GSuiteServer {
         // MCP规范：从extra参数中提取认证信息（不能使用URI参数）
         // 最小侵入性：仅提取JWT并内部缓存，不修改工具参数
 
-        if (extra?.headers?.authorization && args?.email) {
-          const jwt = extractJWTFromHeader(extra.headers.authorization);
+        if ((extra as any)?.headers?.authorization && args?.email) {
+          const jwt = extractJWTFromHeader((extra as any).headers.authorization);
           if (jwt) {
             try {
               const accountManager = getAccountManager();

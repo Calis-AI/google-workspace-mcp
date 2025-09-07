@@ -417,7 +417,7 @@ export class AccountManager {
   }
 
   // Token related methods
-  async validateToken(email: string, skipValidationForNew: boolean = false) {
+  async validateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
     // 获取账户信息
     const account = this.accounts.get(email);
     if (!account) {
@@ -428,9 +428,9 @@ export class AccountManager {
       };
     }
 
-    // 获取当前token
-    const tokenData = await this.tokenManager.getToken(email);
-    if (!tokenData) {
+    // 获取当前token状态
+    const tokenStatus = await this.tokenManager.getTokenStatus(email);
+    if (!tokenStatus || !tokenStatus.token) {
       return {
         valid: false,
         status: 'NO_TOKEN' as const,
@@ -439,9 +439,9 @@ export class AccountManager {
     }
 
     // 判断token类型并验证
-    if (this.jwtTokenManager?.isJWTToken(tokenData.access_token)) {
+    if (this.jwtTokenManager?.isJWTToken(tokenStatus.token)) {
       // JWT token验证
-      return await this.jwtTokenManager.validateJWT(email, tokenData.access_token);
+      return await this.jwtTokenManager.validateJWT(email, tokenStatus.token);
     } else {
       // OAuth token验证（现有逻辑）
       return await this.tokenManager.validateToken(email, skipValidationForNew);
@@ -627,7 +627,7 @@ export class AccountManager {
    * @param skipValidationForNew 是否跳过新账户验证
    * @returns Token验证结果
    */
-  async validateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
+  async smartValidateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
     // 清理过期缓存
     this.cleanupExpiredJWTCache();
     
@@ -656,9 +656,9 @@ export class AccountManager {
    * 原有的Token验证逻辑（重命名避免递归）
    */
   private async existingValidateToken(email: string, skipValidationForNew: boolean = false): Promise<TokenStatus> {
-    // 获取当前token
-    const tokenData = await this.tokenManager.getToken(email);
-    if (!tokenData) {
+    // 获取当前token状态
+    const tokenStatus = await this.tokenManager.getTokenStatus(email);
+    if (!tokenStatus || !tokenStatus.token) {
       return {
         valid: false,
         status: 'NO_TOKEN' as const,
@@ -667,9 +667,9 @@ export class AccountManager {
     }
     
     // 判断token类型并验证
-    if (this.jwtTokenManager?.isJWTToken(tokenData.access_token)) {
+    if (this.jwtTokenManager?.isJWTToken(tokenStatus.token)) {
       // JWT token验证（来自文件存储）
-      return await this.jwtTokenManager.validateJWT(email, tokenData.access_token);
+      return await this.jwtTokenManager.validateJWT(email, tokenStatus.token);
     } else {
       // OAuth token验证（现有逻辑）
       return await this.tokenManager.validateToken(email, skipValidationForNew);
