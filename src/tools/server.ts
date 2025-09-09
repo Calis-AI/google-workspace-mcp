@@ -19,7 +19,9 @@ import {
   handleListWorkspaceAccounts,
   handleAuthenticateWorkspaceAccount,
   handleCompleteWorkspaceAuth,
-  handleRemoveWorkspaceAccount
+  handleRemoveWorkspaceAccount,
+  handleSetWorkspaceAccountToken,
+  handleGetWorkspaceConfig
 } from './account-handlers.js';
 
 import {
@@ -190,6 +192,12 @@ export class GSuiteServer {
           case 'remove_workspace_account':
             assertBaseToolArguments(args);
             result = await handleRemoveWorkspaceAccount(args);
+            break;
+          case 'set_workspace_account_token':
+            result = await handleSetWorkspaceAccountToken(args as any);
+            break;
+          case 'get_workspace_config':
+            result = await handleGetWorkspaceConfig();
             break;
 
           // Gmail Operations

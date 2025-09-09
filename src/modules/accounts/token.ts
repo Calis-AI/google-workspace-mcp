@@ -38,7 +38,7 @@ export class TokenManager {
       await fs.mkdir(this.credentialsPath, { recursive: true });
       const tokenPath = this.getTokenPath(email);
       await fs.writeFile(tokenPath, JSON.stringify(tokenData, null, 2));
-      logger.debug(`Token saved successfully at: ${tokenPath}`);
+      logger.info(`Token saved successfully at: ${tokenPath}`);
     } catch (error) {
       throw new AccountError(
         'Failed to save token',

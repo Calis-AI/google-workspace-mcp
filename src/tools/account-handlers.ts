@@ -1,5 +1,6 @@
 import { getAccountManager } from '../modules/accounts/index.js';
 import { McpToolResponse, BaseToolArguments } from './types.js';
+import path from 'path';
 
 /**
  * Lists all configured Google Workspace accounts and their authentication status
@@ -156,5 +157,119 @@ export async function handleRemoveWorkspaceAccount(args: BaseToolArguments): Pro
         message: `Successfully removed account ${args.email} and deleted associated tokens`
       }, null, 2)
     }]
+  };
+}
+
+export interface SetAccountTokenArgs extends BaseToolArguments {
+  category?: string;
+  description?: string;
+  token: {
+    access_token: string;
+    refresh_token?: string;
+    expiry_date: number; // ms
+    token_type?: string;
+    scope?: string | string[];
+  };
+  validate?: boolean;
+}
+
+function resolvePaths() {
+  const accountsPath =
+    process.env.ACCOUNTS_PATH ||
+    (process.env.MCP_MODE
+      ? path.resolve(process.env.HOME || '', '.mcp/google-workspace-mcp/accounts.json')
+      : '/app/config/accounts.json');
+  const credentialsPath =
+    process.env.CREDENTIALS_PATH ||
+    (process.env.MCP_MODE
+      ? path.resolve(process.env.HOME || '', '.mcp/google-workspace-mcp/credentials')
+      : '/app/config/credentials');
+  return { accountsPath, credentialsPath };
+}
+
+function sanitizeAccount(account: any) {
+  if (!account) return null;
+  const auth = account.auth_status || {};
+  return {
+    email: account.email,
+    category: account.category,
+    description: account.description,
+    auth_status: {
+      valid: Boolean(auth?.valid),
+      status: auth?.status,
+      reason: auth?.reason,
+      authUrl: auth?.authUrl,
+    },
+  };
+}
+
+export async function handleSetWorkspaceAccountToken(args: SetAccountTokenArgs): Promise<any> {
+  const accountManager = getAccountManager();
+  const email = args.email;
+  const category = args.category ?? 'work';
+  const description = args.description ?? 'Work Account';
+
+  // Normalize token payload
+  const token: any = { ...(args.token || {}) };
+  if (!token.token_type) token.token_type = 'Bearer';
+  if (typeof token.expiry_date === 'number' && token.expiry_date < 1_000_000_000_000) {
+    token.expiry_date = token.expiry_date * 1000; // seconds -> ms
+  }
+  if (Array.isArray(token.scope)) {
+    token.scope = token.scope.join(' ');
+  }
+
+  // Ensure account exists and save token
+  await accountManager.validateAccount(email, category, description);
+  await accountManager.saveToken(email, token);
+
+  let account = null;
+  if (args.validate !== false) {
+    account = await accountManager.validateAccount(email);
+  } else {
+    account = await accountManager.getAccount(email);
+  }
+
+  const { accountsPath, credentialsPath } = resolvePaths();
+  const warnings: string[] = [];
+  if (!token.refresh_token) warnings.push('No refresh_token provided - token will expire');
+  if (typeof token.expiry_date === 'number' && token.expiry_date - Date.now() <= 5 * 60 * 1000) {
+    warnings.push('Token expires soon (<=5 minutes) - will require refresh');
+  }
+
+  return {
+    status: 'success',
+    account: sanitizeAccount(account),
+    paths: {
+      accountsPath,
+      credentialsPath,
+      env: {
+        MCP_MODE: process.env.MCP_MODE || '',
+        ACCOUNTS_PATH: process.env.ACCOUNTS_PATH || '',
+        CREDENTIALS_PATH: process.env.CREDENTIALS_PATH || '',
+        GOOGLE_CLIENT_ID: Boolean(process.env.GOOGLE_CLIENT_ID),
+        GOOGLE_CLIENT_SECRET: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      },
+    },
+    warnings,
+  };
+}
+
+export async function handleGetWorkspaceConfig(): Promise<any> {
+  const { accountsPath, credentialsPath } = resolvePaths();
+  return {
+    status: 'success',
+    paths: {
+      accountsPath,
+      credentialsPath,
+    },
+    env: {
+      MCP_MODE: process.env.MCP_MODE || '',
+      ACCOUNTS_PATH: process.env.ACCOUNTS_PATH || '',
+      CREDENTIALS_PATH: process.env.CREDENTIALS_PATH || '',
+      GOOGLE_CLIENT_ID: Boolean(process.env.GOOGLE_CLIENT_ID),
+      GOOGLE_CLIENT_SECRET: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+      HOME: process.env.HOME || '',
+    },
   };
 }
