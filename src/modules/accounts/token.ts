@@ -49,7 +49,7 @@ export class TokenManager {
   }
 
   async loadToken(email: string): Promise<any> {
-    logger.debug(`Loading token for account: ${email}`);
+    logger.info(`Loading token for account: ${email}`);
     try {
       const tokenPath = this.getTokenPath(email);
       const data = await fs.readFile(tokenPath, 'utf-8');
@@ -93,7 +93,7 @@ export class TokenManager {
    * Returns the renewal result and new token if successful
    */
   async autoRenewToken(email: string): Promise<TokenRenewalResult> {
-    logger.debug(`Attempting auto-renewal for account: ${email}`);
+    logger.info(`Attempting auto-renewal for account: ${email}`);
     
     try {
       const token = await this.loadToken(email);

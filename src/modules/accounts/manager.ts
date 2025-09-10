@@ -49,7 +49,7 @@ export class AccountManager {
   }
 
   async listAccounts(): Promise<Account[]> {
-    logger.debug('Listing accounts with auth status');
+    logger.info('Listing accounts with auth status');
     const accounts = Array.from(this.accounts.values());
     
     // Add auth status to each account and attempt auto-renewal if needed
