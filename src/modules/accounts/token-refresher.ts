@@ -61,7 +61,7 @@ export class BackendTokenRefresher implements TokenRefresher {
   private retries: number;
 
   constructor() {
-    const url = process.env.REFRESH_TOKEN_URL || 'http://127.0.0.1:8000/refresh_token';
+    const url = process.env.REFRESH_TOKEN_URL || 'http://127.0.0.1:8000/api/v1/user/refresh_token';
     this.url = url;
     this.headers = {};
     if (process.env.REFRESH_AUTH_HEADER) {

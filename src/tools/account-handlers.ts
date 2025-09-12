@@ -1,6 +1,7 @@
 import { getAccountManager } from '../modules/accounts/index.js';
 import { McpToolResponse, BaseToolArguments } from './types.js';
 import path from 'path';
+import logger from "../utils/logger.js";
 
 /**
  * Lists all configured Google Workspace accounts and their authentication status
@@ -218,9 +219,16 @@ export async function handleSetWorkspaceAccountToken(args: SetAccountTokenArgs):
   if (Array.isArray(token.scope)) {
     token.scope = token.scope.join(' ');
   }
+  logger.info(`handleSetWorkspaceAccountToken ${token.expiry_date} ${token.expiry_date} ${token.scope} ${token.access_token}`);
 
-  // Ensure account exists and save token
-  await accountManager.validateAccount(email, category, description);
+
+  // Ensure account exists (without triggering OAuth in delegated mode)
+  const existing = await accountManager.getAccount(email);
+  if (!existing) {
+    await accountManager.addAccount(email, category, description);
+  }
+
+  // Save token before any validation to avoid NO_TOKEN -> OAuth URL path
   await accountManager.saveToken(email, token);
 
   let account = null;
@@ -232,7 +240,7 @@ export async function handleSetWorkspaceAccountToken(args: SetAccountTokenArgs):
 
   const { accountsPath, credentialsPath } = resolvePaths();
   const warnings: string[] = [];
-  warnings.push('Delegated mode: token stored in memory only; refresh handled via backend');
+  warnings.push('Delegated mode: refresh handled via backend; refresh_token is ignored');
 
   return {
     status: 'success',

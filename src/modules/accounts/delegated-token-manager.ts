@@ -1,10 +1,10 @@
 import logger from '../../utils/logger.js';
 import { AccountError, TokenRenewalResult, TokenStatus } from './types.js';
-import { InMemoryTokenStore, TokenPayload } from './token-store.js';
+import { FileTokenStore, TokenPayload } from './token-store.js';
 import { BackendTokenRefresher } from './token-refresher.js';
 
 export class DelegatedTokenManager {
-  private readonly store = new InMemoryTokenStore();
+  private readonly store = new FileTokenStore('delegated');
   private readonly refresher = new BackendTokenRefresher();
   private readonly TOKEN_EXPIRY_BUFFER_MS = Number(process.env.TOKEN_EXPIRY_BUFFER_MS || 5 * 60 * 1000);
 
@@ -27,7 +27,7 @@ export class DelegatedTokenManager {
     }
 
     await this.store.save(email, token);
-    logger.info(`Token cached in memory for ${email}`);
+    logger.info(`Token saved for ${email}`);
   }
 
   async loadToken(email: string): Promise<TokenPayload | null> {

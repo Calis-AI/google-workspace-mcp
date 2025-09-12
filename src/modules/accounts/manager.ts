@@ -73,7 +73,8 @@ export class AccountManager {
       } else {
         if (this.delegatedMode) {
           account.auth_status = {
-            valid: false,
+              //TODO
+            valid: true,
             status: renewalResult.status,
             reason: renewalResult.reason || 'No token in memory. Call set_workspace_account_token.'
           };
@@ -331,7 +332,7 @@ export class AccountManager {
             valid: false,
             status: tokenStatus.status,
             reason: isNewAccount ? 'New account requires authentication' : 'No token found',
-            authUrl: await this.generateAuthUrl()
+            authUrl: this.delegatedMode ? undefined : await this.generateAuthUrl()
           };
           break;
           
@@ -350,7 +351,7 @@ export class AccountManager {
             valid: false,
             status: tokenStatus.status,
             reason: tokenStatus.reason,
-            authUrl: await this.generateAuthUrl()
+            authUrl: this.delegatedMode ? undefined : await this.generateAuthUrl()
           };
           break;
           
@@ -359,7 +360,7 @@ export class AccountManager {
             valid: false,
             status: tokenStatus.status,
             reason: 'Authentication error occurred',
-            authUrl: await this.generateAuthUrl()
+            authUrl: this.delegatedMode ? undefined : await this.generateAuthUrl()
           };
           break;
       }
