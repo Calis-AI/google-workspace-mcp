@@ -232,10 +232,7 @@ export async function handleSetWorkspaceAccountToken(args: SetAccountTokenArgs):
 
   const { accountsPath, credentialsPath } = resolvePaths();
   const warnings: string[] = [];
-  if (!token.refresh_token) warnings.push('No refresh_token provided - token will expire');
-  if (typeof token.expiry_date === 'number' && token.expiry_date - Date.now() <= 5 * 60 * 1000) {
-    warnings.push('Token expires soon (<=5 minutes) - will require refresh');
-  }
+  warnings.push('Delegated mode: token stored in memory only; refresh handled via backend');
 
   return {
     status: 'success',

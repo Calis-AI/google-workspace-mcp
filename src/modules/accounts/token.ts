@@ -97,7 +97,7 @@ export class TokenManager {
     
     try {
       const token = await this.loadToken(email);
-      
+      logger.info(`Token renewal for account: ${token}`);
       if (!token) {
         return {
           success: false,
@@ -117,6 +117,7 @@ export class TokenManager {
       // Check if token is expired or will expire soon
       const now = Date.now();
       if (token.expiry_date <= now + this.TOKEN_EXPIRY_BUFFER_MS) {
+          logger.info(`Token renewal for account: ${token} expiry_date: ${token.expiry_date} nowWtiBuffer  ${this.TOKEN_EXPIRY_BUFFER_MS}`);
         if (!token.refresh_token || !this.oauthClient) {
           return {
             success: false,
@@ -138,6 +139,7 @@ export class TokenManager {
         } catch (error) {
           // Check if the error indicates an invalid/revoked refresh token
           const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+          logger.error("refreshToken fail ",errorMessage);
           const isRefreshTokenInvalid = 
             errorMessage.includes('invalid_grant') || 
             errorMessage.includes('token has been revoked') ||

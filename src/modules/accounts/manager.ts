@@ -4,13 +4,17 @@ import { Account, AccountsConfig, AccountError, AccountModuleConfig } from './ty
 import { scopeRegistry } from '../tools/scope-registry.js';
 import { TokenManager } from './token.js';
 import { GoogleOAuthClient } from './oauth.js';
+import { DelegatedTokenManager } from './delegated-token-manager.js';
+import { OAuth2Client } from 'google-auth-library';
 import logger from '../../utils/logger.js';
 
 export class AccountManager {
   private readonly accountsPath: string;
   private accounts: Map<string, Account>;
-  private tokenManager!: TokenManager;
+  private tokenManager!: TokenManager | DelegatedTokenManager;
   private oauthClient!: GoogleOAuthClient;
+  private delegatedMode: boolean = true;
+  private lightweightAuthClient?: OAuth2Client;
   private currentAuthEmail?: string;
 
   constructor(config?: AccountModuleConfig) {
@@ -23,26 +27,35 @@ export class AccountManager {
 
   async initialize(): Promise<void> {
     logger.info('Initializing AccountManager...');
-    this.oauthClient = new GoogleOAuthClient();
-    this.tokenManager = new TokenManager(this.oauthClient);
+    if (this.delegatedMode) {
+      // In delegated mode, do not require GOOGLE_CLIENT_ID/SECRET
+      this.lightweightAuthClient = new OAuth2Client();
+      this.tokenManager = new DelegatedTokenManager() as unknown as TokenManager;
+      logger.info('AccountManager initialized in delegated token mode');
+    } else {
+      this.oauthClient = new GoogleOAuthClient();
+      this.tokenManager = new TokenManager(this.oauthClient);
+    }
     
     // Set up automatic authentication completion
-    const { OAuthCallbackServer } = await import('./callback-server.js');
-    const callbackServer = OAuthCallbackServer.getInstance();
-    callbackServer.setAuthHandler(async (code: string) => {
-      if (this.currentAuthEmail) {
-        try {
-          logger.info(`Auto-completing authentication for ${this.currentAuthEmail}`);
-          const tokenData = await this.getTokenFromCode(code);
-          await this.saveToken(this.currentAuthEmail, tokenData);
-          logger.info(`Authentication completed automatically for ${this.currentAuthEmail}`);
-          this.currentAuthEmail = undefined;
-        } catch (error) {
-          logger.error('Failed to auto-complete authentication:', error);
-          this.currentAuthEmail = undefined;
+    if (!this.delegatedMode) {
+      const { OAuthCallbackServer } = await import('./callback-server.js');
+      const callbackServer = OAuthCallbackServer.getInstance();
+      callbackServer.setAuthHandler(async (code: string) => {
+        if (this.currentAuthEmail) {
+          try {
+            logger.info(`Auto-completing authentication for ${this.currentAuthEmail}`);
+            const tokenData = await this.getTokenFromCode(code);
+            await this.saveToken(this.currentAuthEmail, tokenData);
+            logger.info(`Authentication completed automatically for ${this.currentAuthEmail}`);
+            this.currentAuthEmail = undefined;
+          } catch (error) {
+            logger.error('Failed to auto-complete authentication:', error);
+            this.currentAuthEmail = undefined;
+          }
         }
-      }
-    });
+      });
+    }
     
     await this.loadAccounts();
     logger.info('AccountManager initialized successfully');
@@ -55,20 +68,23 @@ export class AccountManager {
     // Add auth status to each account and attempt auto-renewal if needed
     for (const account of accounts) {
       const renewalResult = await this.tokenManager.autoRenewToken(account.email);
-      
       if (renewalResult.success) {
-        account.auth_status = {
-          valid: true,
-          status: renewalResult.status
-        };
+        account.auth_status = { valid: true, status: renewalResult.status };
       } else {
-        // If auto-renewal failed, try to get an auth URL for re-authentication
-        account.auth_status = {
-          valid: false,
-          status: renewalResult.status,
-          reason: renewalResult.reason,
-          authUrl: await this.generateAuthUrl()
-        };
+        if (this.delegatedMode) {
+          account.auth_status = {
+            valid: false,
+            status: renewalResult.status,
+            reason: renewalResult.reason || 'No token in memory. Call set_workspace_account_token.'
+          };
+        } else {
+          account.auth_status = {
+            valid: false,
+            status: renewalResult.status,
+            reason: renewalResult.reason,
+            authUrl: await this.generateAuthUrl()
+          };
+        }
       }
     }
     
@@ -106,7 +122,7 @@ export class AccountManager {
       // Perform the operation
       return await operation();
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === '401') {
+      if (error instanceof Error && 'code' in error && (error as any).code === '401') {
         // If we get a 401 during operation, try one more token renewal
         logger.warn('Received 401 during operation, attempting final token renewal');
         const finalRenewal = await this.tokenManager.autoRenewToken(email);
@@ -366,30 +382,71 @@ export class AccountManager {
 
   // OAuth related methods
   async generateAuthUrl(): Promise<string> {
+    if (this.delegatedMode) {
+      throw new AccountError(
+        'OAuth auth URL is disabled in delegated mode',
+        'AUTH_DISABLED',
+        'Use set_workspace_account_token to inject an access token'
+      );
+    }
     const allScopes = scopeRegistry.getAllScopes();
     return this.oauthClient.generateAuthUrl(allScopes);
   }
   
   async startAuthentication(email: string): Promise<string> {
+    if (this.delegatedMode) {
+      throw new AccountError(
+        'Authentication is disabled in delegated mode',
+        'AUTH_DISABLED',
+        'Use set_workspace_account_token to inject an access token'
+      );
+    }
     this.currentAuthEmail = email;
     logger.info(`Starting authentication for ${email}`);
     return this.generateAuthUrl();
   }
 
   async waitForAuthorizationCode(): Promise<string> {
+    if (this.delegatedMode) {
+      throw new AccountError(
+        'Waiting for auth code is disabled in delegated mode',
+        'AUTH_DISABLED',
+        'Use set_workspace_account_token to inject an access token'
+      );
+    }
     return this.oauthClient.waitForAuthorizationCode();
   }
 
   async getTokenFromCode(code: string): Promise<any> {
+    if (this.delegatedMode) {
+      throw new AccountError(
+        'Exchanging auth code is disabled in delegated mode',
+        'AUTH_DISABLED',
+        'Use set_workspace_account_token to inject an access token'
+      );
+    }
     const token = await this.oauthClient.getTokenFromCode(code);
     return token;
   }
 
   async refreshToken(refreshToken: string): Promise<any> {
+    if (this.delegatedMode) {
+      throw new AccountError(
+        'Direct refresh is disabled in delegated mode',
+        'AUTH_DISABLED',
+        'Server refreshes via backend /refresh_token automatically'
+      );
+    }
     return this.oauthClient.refreshToken(refreshToken);
   }
 
   async getAuthClient() {
+    if (this.delegatedMode) {
+      if (!this.lightweightAuthClient) {
+        this.lightweightAuthClient = new (await import('google-auth-library')).OAuth2Client();
+      }
+      return this.lightweightAuthClient;
+    }
     return this.oauthClient.getAuthClient();
   }
 

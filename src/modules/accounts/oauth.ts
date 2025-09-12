@@ -78,7 +78,7 @@ export class GoogleOAuthClient {
   }
 
   async refreshToken(refreshToken: string): Promise<any> {
-    logger.info('Refreshing access token');
+    logger.info(`Refreshing access token ${refreshToken}`);
     try {
       this.oauth2Client.setCredentials({
         refresh_token: refreshToken
