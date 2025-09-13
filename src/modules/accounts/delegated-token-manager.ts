@@ -6,7 +6,7 @@ import { BackendTokenRefresher } from './token-refresher.js';
 export class DelegatedTokenManager {
   private readonly store = new FileTokenStore('delegated');
   private readonly refresher = new BackendTokenRefresher();
-  private readonly TOKEN_EXPIRY_BUFFER_MS = Number(process.env.TOKEN_EXPIRY_BUFFER_MS || 5 * 60 * 1000);
+  private readonly TOKEN_EXPIRY_BUFFER_MS = Number(1000);
 
   async saveToken(email: string, tokenData: any): Promise<void> {
     const token: TokenPayload = {
@@ -70,7 +70,9 @@ export class DelegatedTokenManager {
     }
 
     // In delegated mode, do not call Google token introspection; rely on expiry and 401 handling
+
     if (token.expiry_date <= Date.now()) {
+       logger.info(`Token expiry date: ${token.expiry_date} now expired: ${token.expiry_date}`);
       const renew = await this.autoRenewToken(email);
       if (renew.success && renew.token) {
         return { valid: true, status: 'REFRESHED', token: renew.token, requiredScopes: renew.token.scope ? renew.token.scope.split(' ') : undefined };

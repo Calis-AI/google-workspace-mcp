@@ -105,6 +105,7 @@ export class AccountManager {
     try {
       // Attempt auto-renewal before operation
       const renewalResult = await this.tokenManager.autoRenewToken(email);
+
       if (!renewalResult.success) {
         if (renewalResult.canRetry) {
           // If it's a temporary error, let the operation proceed

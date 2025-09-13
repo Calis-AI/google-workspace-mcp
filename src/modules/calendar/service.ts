@@ -16,6 +16,7 @@ import {
 import { AttachmentService } from '../attachments/service.js';
 import { DriveService } from '../drive/service.js';
 import { ATTACHMENT_FOLDERS, AttachmentSource, AttachmentMetadata } from '../attachments/types.js';
+import logger from "../../utils/logger.js";
 
 type CalendarEvent = calendar_v3.Schema$Event;
 type GoogleEventAttachment = calendar_v3.Schema$EventAttachment;
@@ -235,7 +236,8 @@ export class CalendarService {
    * Retrieve calendar events with optional filtering
    */
   async getEvents({ email, query, maxResults = 10, timeMin, timeMax }: GetEventsParams): Promise<EventResponse[]> {
-    const calendar = await this.getCalendarClient(email);
+      logger.info(`getEvents for ${email}`);
+      const calendar = await this.getCalendarClient(email);
 
     return this.handleCalendarOperation(email, async () => {
       const params: calendar_v3.Params$Resource$Events$List = {
@@ -257,6 +259,7 @@ export class CalendarService {
           }
           params.timeMin = date.toISOString();
         } catch (error) {
+          logger.error(`getEvents for ${email} Invalid date format'`);
           throw new CalendarError(
             'Invalid date format',
             'INVALID_DATE',

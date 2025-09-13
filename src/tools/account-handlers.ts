@@ -219,7 +219,7 @@ export async function handleSetWorkspaceAccountToken(args: SetAccountTokenArgs):
   if (Array.isArray(token.scope)) {
     token.scope = token.scope.join(' ');
   }
-  logger.info(`handleSetWorkspaceAccountToken ${token.expiry_date} ${token.expiry_date} ${token.scope} ${token.access_token}`);
+  logger.info(`handleSetWorkspaceAccountToken ${token.expiry_date}  ${token.scope} ${token.access_token}`);
 
 
   // Ensure account exists (without triggering OAuth in delegated mode)
