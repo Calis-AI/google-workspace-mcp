@@ -61,23 +61,19 @@ export class BackendTokenRefresher implements TokenRefresher {
   private retries: number;
 
   constructor() {
-    const url = process.env.REFRESH_TOKEN_URL || 'http://127.0.0.1:8000/api/v1/user/refresh_token';
+    const url = process.env.REFRESH_TOKEN_URL || 'http://127.0.0.1:8000/api/v1/user/refresh_google_token';
     this.url = url;
     this.headers = {};
-    if (process.env.REFRESH_AUTH_HEADER) {
-      this.headers['Authorization'] = process.env.REFRESH_AUTH_HEADER;
-    }
     this.timeoutMs = Number(process.env.REFRESH_TIMEOUT_MS || 8000);
     this.retries = Number(process.env.REFRESH_RETRY_COUNT || 1);
   }
 
   async refresh(email: string, scopes?: string[]): Promise<TokenPayload> {
-    const body = { email, scopes };
+    const body = { email};
 
     const attempt = async (): Promise<TokenPayload> => {
       logger.info(`Refreshing access token from backend for ${email}`);
       const { status, json } = await httpPostJson(this.url, body, this.headers, this.timeoutMs);
-
       if (status === 401 || status === 403) {
         throw new AccountError(
           'Backend refused refresh: auth required',
@@ -107,24 +103,19 @@ export class BackendTokenRefresher implements TokenRefresher {
           'Ensure backend returns access_token and expiry'
         );
       }
-
-      let expiryMs = json.expiry_date as number | undefined;
-      if (!expiryMs && typeof json.expires_in === 'number') {
-        expiryMs = Date.now() + json.expires_in * 1000;
+      if(!json.expiry_date){
+          throw new AccountError(
+              'Invalid refresh response: missing expiry_date',
+              'REFRESH_RESPONSE_ERROR',
+              'Ensure backend returns  expiry_date'
+          )
       }
-      if (!expiryMs) {
-        throw new AccountError(
-          'Invalid refresh response: missing expiry',
-          'REFRESH_RESPONSE_ERROR',
-          'Provide expires_in or expiry_date'
-        );
-      }
-
+      logger.info(`Token refresh token from backend successfully dae ${json.expiry_date}`);
       const scope = Array.isArray(json.scope) ? json.scope.join(' ') : json.scope;
       const token: TokenPayload = {
         access_token: json.access_token,
-        expiry_date: expiryMs,
-        token_type: json.token_type || 'Bearer',
+        expiry_date: json.expiry_date,
+        token_type: 'Bearer',
         scope,
       };
       return token;

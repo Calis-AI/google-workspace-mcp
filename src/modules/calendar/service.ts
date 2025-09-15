@@ -247,10 +247,12 @@ export class CalendarService {
         orderBy: 'startTime'
       };
 
+
       if (query) {
         params.q = query;
       }
 
+      logger.info(`getEvents for ${email} params${params}`);
       if (timeMin) {
         try {
           const date = new Date(timeMin);
@@ -283,7 +285,7 @@ export class CalendarService {
           );
         }
       }
-
+        logger.info(`getEvents for ${email} start list events`);
       const { data } = await calendar.events.list(params);
 
       if (!data.items || data.items.length === 0) {
