@@ -40,6 +40,7 @@ import {
   IncomingGmailAttachment
 } from '../modules/gmail/types.js';
 import { ManageAttachmentParams } from './types.js';
+import logger from "../utils/logger.js";
 
 interface SearchEmailsParams {
   email: string;
@@ -91,7 +92,8 @@ interface ManageDraftParams {
 }
 
 export async function handleSearchWorkspaceEmails(params: SearchEmailsParams) {
-  await initializeServices();
+    logger.info( `handleSearchWorkspaceEmails ${params.email}`)
+    await initializeServices();
   const { email, search = {}, options = {}, messageIds } = params;
 
   if (!email) {

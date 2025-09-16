@@ -38,7 +38,7 @@ export class TokenManager {
       await fs.mkdir(this.credentialsPath, { recursive: true });
       const tokenPath = this.getTokenPath(email);
       await fs.writeFile(tokenPath, JSON.stringify(tokenData, null, 2));
-      logger.debug(`Token saved successfully at: ${tokenPath}`);
+      logger.info(`Token saved successfully at: ${tokenPath}`);
     } catch (error) {
       throw new AccountError(
         'Failed to save token',
@@ -49,7 +49,7 @@ export class TokenManager {
   }
 
   async loadToken(email: string): Promise<any> {
-    logger.debug(`Loading token for account: ${email}`);
+    logger.info(`Loading token for account: ${email}`);
     try {
       const tokenPath = this.getTokenPath(email);
       const data = await fs.readFile(tokenPath, 'utf-8');
@@ -93,11 +93,11 @@ export class TokenManager {
    * Returns the renewal result and new token if successful
    */
   async autoRenewToken(email: string): Promise<TokenRenewalResult> {
-    logger.debug(`Attempting auto-renewal for account: ${email}`);
+    logger.info(`Attempting auto-renewal for account: ${email}`);
     
     try {
       const token = await this.loadToken(email);
-      
+      logger.info(`Token renewal for account: ${email}`);
       if (!token) {
         return {
           success: false,
@@ -117,6 +117,7 @@ export class TokenManager {
       // Check if token is expired or will expire soon
       const now = Date.now();
       if (token.expiry_date <= now + this.TOKEN_EXPIRY_BUFFER_MS) {
+          logger.info(`Token renewal for account: ${email} expiry_date: ${token.expiry_date} nowWtiBuffer  ${this.TOKEN_EXPIRY_BUFFER_MS}`);
         if (!token.refresh_token || !this.oauthClient) {
           return {
             success: false,
@@ -138,6 +139,7 @@ export class TokenManager {
         } catch (error) {
           // Check if the error indicates an invalid/revoked refresh token
           const errorMessage = error instanceof Error ? error.message.toLowerCase() : '';
+          logger.error("refreshToken fail ",errorMessage);
           const isRefreshTokenInvalid = 
             errorMessage.includes('invalid_grant') || 
             errorMessage.includes('token has been revoked') ||

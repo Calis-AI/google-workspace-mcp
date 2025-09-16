@@ -118,6 +118,47 @@ export const accountTools: ToolMetadata[] = [
       },
       required: ['email']
     }
+  },
+  {
+    name: 'set_workspace_account_token',
+    category: 'Account Management',
+    description: `Upsert a workspace account and set its OAuth token (immediately effective).
+    
+    - Ensures account exists (creates/updates if needed)
+    - Saves token to MCP's credentials store
+    - Optionally validates token and returns auth status
+    - Avoids manual file editing and hot-reload issues`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Account email' },
+        category: { type: 'string', description: 'Account category (default: work)' },
+        description: { type: 'string', description: 'Account description' },
+        token: {
+          type: 'object',
+          description: 'OAuth token payload',
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number', description: 'Milliseconds since epoch' },
+            token_type: { type: 'string' },
+            scope: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }
+          },
+          required: ['access_token', 'expiry_date']
+        },
+        validate: { type: 'boolean', description: 'Validate after save (default: true)' }
+      },
+      required: ['email', 'token']
+    }
+  },
+  {
+    name: 'get_workspace_config',
+    category: 'Account Management',
+    description: 'Return current MCP workspace paths and key env flags for diagnostics',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
   }
 ];
 
@@ -763,6 +804,47 @@ export const calendarTools: ToolMetadata[] = [
       },
       required: ['email', 'eventId']
     }
+  },
+  {
+    name: 'set_workspace_account_token',
+    category: 'Account Management',
+    description: `Upsert a workspace account and set its OAuth token (immediately effective).
+    
+    - Ensures account exists (creates/updates if needed)
+    - Saves token to MCP's credentials store
+    - Optionally validates token and returns auth status
+    - Avoids manual file editing and hot-reload issues`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Account email' },
+        category: { type: 'string', description: 'Account category (default: work)' },
+        description: { type: 'string', description: 'Account description' },
+        token: {
+          type: 'object',
+          description: 'OAuth token payload',
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number', description: 'Milliseconds since epoch' },
+            token_type: { type: 'string' },
+            scope: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }
+          },
+          required: ['access_token', 'expiry_date']
+        },
+        validate: { type: 'boolean', description: 'Validate after save (default: true)' }
+      },
+      required: ['email', 'token']
+    }
+  },
+  {
+    name: 'get_workspace_config',
+    category: 'Account Management',
+    description: 'Return current MCP workspace paths and key env flags for diagnostics',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
   }
 ];
 
@@ -1043,6 +1125,47 @@ export const labelTools: ToolMetadata[] = [
         }
       },
       required: ['email', 'action']
+    }
+  },
+  {
+    name: 'set_workspace_account_token',
+    category: 'Account Management',
+    description: `Upsert a workspace account and set its OAuth token (immediately effective).
+    
+    - Ensures account exists (creates/updates if needed)
+    - Saves token to MCP's credentials store
+    - Optionally validates token and returns auth status
+    - Avoids manual file editing and hot-reload issues`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Account email' },
+        category: { type: 'string', description: 'Account category (default: work)' },
+        description: { type: 'string', description: 'Account description' },
+        token: {
+          type: 'object',
+          description: 'OAuth token payload',
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number', description: 'Milliseconds since epoch' },
+            token_type: { type: 'string' },
+            scope: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }
+          },
+          required: ['access_token', 'expiry_date']
+        },
+        validate: { type: 'boolean', description: 'Validate after save (default: true)' }
+      },
+      required: ['email', 'token']
+    }
+  },
+  {
+    name: 'get_workspace_config',
+    category: 'Account Management',
+    description: 'Return current MCP workspace paths and key env flags for diagnostics',
+    inputSchema: {
+      type: 'object',
+      properties: {}
     }
   }
 ];
@@ -1401,6 +1524,47 @@ export const driveTools: ToolMetadata[] = [
       },
       required: ['email', 'fileId']
     }
+  },
+  {
+    name: 'set_workspace_account_token',
+    category: 'Account Management',
+    description: `Upsert a workspace account and set its OAuth token (immediately effective).
+    
+    - Ensures account exists (creates/updates if needed)
+    - Saves token to MCP's credentials store
+    - Optionally validates token and returns auth status
+    - Avoids manual file editing and hot-reload issues`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Account email' },
+        category: { type: 'string', description: 'Account category (default: work)' },
+        description: { type: 'string', description: 'Account description' },
+        token: {
+          type: 'object',
+          description: 'OAuth token payload',
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number', description: 'Milliseconds since epoch' },
+            token_type: { type: 'string' },
+            scope: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }
+          },
+          required: ['access_token', 'expiry_date']
+        },
+        validate: { type: 'boolean', description: 'Validate after save (default: true)' }
+      },
+      required: ['email', 'token']
+    }
+  },
+  {
+    name: 'get_workspace_config',
+    category: 'Account Management',
+    description: 'Return current MCP workspace paths and key env flags for diagnostics',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
   }
 ];
 
@@ -1453,6 +1617,47 @@ export const contactsTools: ToolMetadata[] = [
         }
       },
       required: ["email", "personFields"]
+    }
+  },
+  {
+    name: 'set_workspace_account_token',
+    category: 'Account Management',
+    description: `Upsert a workspace account and set its OAuth token (immediately effective).
+    
+    - Ensures account exists (creates/updates if needed)
+    - Saves token to MCP's credentials store
+    - Optionally validates token and returns auth status
+    - Avoids manual file editing and hot-reload issues`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: { type: 'string', description: 'Account email' },
+        category: { type: 'string', description: 'Account category (default: work)' },
+        description: { type: 'string', description: 'Account description' },
+        token: {
+          type: 'object',
+          description: 'OAuth token payload',
+          properties: {
+            access_token: { type: 'string' },
+            refresh_token: { type: 'string' },
+            expiry_date: { type: 'number', description: 'Milliseconds since epoch' },
+            token_type: { type: 'string' },
+            scope: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] }
+          },
+          required: ['access_token', 'expiry_date']
+        },
+        validate: { type: 'boolean', description: 'Validate after save (default: true)' }
+      },
+      required: ['email', 'token']
+    }
+  },
+  {
+    name: 'get_workspace_config',
+    category: 'Account Management',
+    description: 'Return current MCP workspace paths and key env flags for diagnostics',
+    inputSchema: {
+      type: 'object',
+      properties: {}
     }
   }
 ];
