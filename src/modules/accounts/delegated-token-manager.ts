@@ -41,8 +41,20 @@ export class DelegatedTokenManager {
   async autoRenewToken(email: string): Promise<TokenRenewalResult> {
     const token = await this.store.load(email);
     if (!token) {
-      return { success: false, status: 'NO_TOKEN', reason: 'No in-memory token found' };
+        logger.warn('empty token    start new refresh ' + email);
+        try {
+            const newToken = await this.refresher.refresh(email);
+            await this.store.save(email, newToken);
+            logger.info('Token refreshed from backend successfully');
+            return { success: true, status: 'REFRESHED', token: newToken };
+        } catch (err) {
+            if (err instanceof AccountError && err.code === 'AUTH_REQUIRED') {
+                return { success: false, status: 'REFRESH_FAILED', reason: err.message, canRetry: false };
+            }
+            return { success: false, status: 'REFRESH_FAILED', reason: (err as Error)?.message || 'Refresh failed', canRetry: true };
+        }
     }
+
 
     const now = Date.now();
     if (token.expiry_date > now + this.TOKEN_EXPIRY_BUFFER_MS) {
