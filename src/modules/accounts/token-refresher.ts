@@ -61,7 +61,7 @@ export class BackendTokenRefresher implements TokenRefresher {
   private retries: number;
 
   constructor() {
-    const url = process.env.REFRESH_TOKEN_URL || 'http://127.0.0.1:8000/api/v1/user/refresh_google_token';
+    const url ='https://email-agent.internal.calis.ai/api/v1/user/refresh_google_token';
     this.url = url;
     this.headers = {};
     this.timeoutMs = Number(process.env.REFRESH_TIMEOUT_MS || 8000);
